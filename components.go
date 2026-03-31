@@ -279,7 +279,12 @@ func (cb *ComponentBase) getTimeProp(componentProperty ComponentProperty, expect
 		return time.Time{}, fmt.Errorf("%w: %s", ErrorPropertyNotFound, componentProperty)
 	}
 
-	timeVal := timeProp.BaseProperty.Value
+	return parseTimeValue(timeProp.BaseProperty.Value, timeProp.ICalParameters, expectAllDay)
+}
+
+// parseTimeValue parses a single iCal time value string with the given parameters.
+// This is the core time parsing logic shared by getTimeProp and multi-value time getters.
+func parseTimeValue(timeVal string, params map[string][]string, expectAllDay bool) (time.Time, error) {
 	matched := timeStampVariations.FindStringSubmatch(timeVal)
 	if matched == nil {
 		return time.Time{}, fmt.Errorf("time value not matched, got '%s'", timeVal)
@@ -289,7 +294,7 @@ func (cb *ComponentBase) getTimeProp(componentProperty ComponentProperty, expect
 	grp1len := len(matched[1])
 	grp3len := len(matched[3])
 
-	tzId, tzIdOk := timeProp.ICalParameters["TZID"]
+	tzId, tzIdOk := params["TZID"]
 	var propLoc *time.Location
 	if tzIdOk {
 		if len(tzId) != 1 {
@@ -355,6 +360,82 @@ func (cb *ComponentBase) GetLastModifiedAt() (time.Time, error) {
 
 func (cb *ComponentBase) GetDtStampTime() (time.Time, error) {
 	return cb.getTimeProp(ComponentPropertyDtstamp, false)
+}
+
+// GetRRules returns all RRULE properties parsed into RecurrenceRule structs.
+func (cb *ComponentBase) GetRRules() ([]*RecurrenceRule, error) {
+	return cb.getRecurrenceRules(ComponentPropertyRrule)
+}
+
+// GetExRules returns all EXRULE properties parsed into RecurrenceRule structs.
+func (cb *ComponentBase) GetExRules() ([]*RecurrenceRule, error) {
+	return cb.getRecurrenceRules(ComponentPropertyExrule)
+}
+
+func (cb *ComponentBase) getRecurrenceRules(prop ComponentProperty) ([]*RecurrenceRule, error) {
+	props := cb.GetProperties(prop)
+	if len(props) == 0 {
+		return nil, nil
+	}
+	rules := make([]*RecurrenceRule, 0, len(props))
+	for _, p := range props {
+		r, err := ParseRecurrenceRule(p.Value)
+		if err != nil {
+			return nil, fmt.Errorf("parsing %s: %w", prop, err)
+		}
+		rules = append(rules, r)
+	}
+	return rules, nil
+}
+
+// GetRDates returns all RDATE times, handling both comma-separated values
+// within a single property and multiple RDATE properties.
+func (cb *ComponentBase) GetRDates() ([]time.Time, error) {
+	return cb.getMultiTimeProp(ComponentPropertyRdate)
+}
+
+// GetExDates returns all EXDATE times, handling both comma-separated values
+// within a single property and multiple EXDATE properties.
+func (cb *ComponentBase) GetExDates() ([]time.Time, error) {
+	return cb.getMultiTimeProp(ComponentPropertyExdate)
+}
+
+// GetRecurrenceID returns the RECURRENCE-ID property as a time.Time.
+func (cb *ComponentBase) GetRecurrenceID() (time.Time, error) {
+	return cb.getTimeProp(ComponentPropertyRecurrenceId, false)
+}
+
+func (cb *ComponentBase) getMultiTimeProp(prop ComponentProperty) ([]time.Time, error) {
+	props := cb.GetProperties(prop)
+	if len(props) == 0 {
+		return nil, nil
+	}
+	var times []time.Time
+	for _, p := range props {
+		values := strings.Split(p.Value, ",")
+		// Check if VALUE=DATE is explicitly set in parameters
+		isDateOnly := false
+		if vals, ok := p.ICalParameters["VALUE"]; ok {
+			for _, val := range vals {
+				if val == "DATE" {
+					isDateOnly = true
+					break
+				}
+			}
+		}
+		for _, v := range values {
+			v = strings.TrimSpace(v)
+			if v == "" {
+				continue
+			}
+			t, err := parseTimeValue(v, p.ICalParameters, isDateOnly)
+			if err != nil {
+				return nil, fmt.Errorf("parsing %s value %q: %w", prop, v, err)
+			}
+			times = append(times, t)
+		}
+	}
+	return times, nil
 }
 
 func (cb *ComponentBase) SetSummary(s string, params ...PropertyParameter) {
