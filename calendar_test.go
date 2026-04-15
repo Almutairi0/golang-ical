@@ -563,9 +563,11 @@ END:VCALENDAR
 
 	// With the handler set to skip, parsing succeeds.
 	var skippedLines []string
+	var skippedErrors []error
 	cal, err := ParseCalendarWithOptions(strings.NewReader(input),
 		WithPropertyParseErrorHandler(func(rawLine ContentLine, parseErr error) (*BaseProperty, error) {
 			skippedLines = append(skippedLines, string(rawLine))
+			skippedErrors = append(skippedErrors, parseErr)
 			return nil, nil // skip
 		}),
 	)
@@ -577,6 +579,9 @@ END:VCALENDAR
 	assert.Equal(t, "Test Event", cal.Events()[0].GetProperty(ComponentPropertySummary).Value)
 	assert.Len(t, skippedLines, 1)
 	assert.Contains(t, skippedLines[0], "X-TKF-PROMOTION-BUTTON")
+	// The parse error should describe the malformed parameter name.
+	assert.Len(t, skippedErrors, 1)
+	assert.Contains(t, skippedErrors[0].Error(), "missing property value for skip")
 }
 
 func TestWithPropertyParseErrorHandler_Abort(t *testing.T) {
@@ -592,13 +597,18 @@ END:VEVENT
 END:VCALENDAR
 `
 	customErr := errors.New("custom abort")
+	var receivedParseErr error
 	_, err := ParseCalendarWithOptions(strings.NewReader(input),
 		WithPropertyParseErrorHandler(func(rawLine ContentLine, parseErr error) (*BaseProperty, error) {
+			receivedParseErr = parseErr
 			return nil, customErr
 		}),
 	)
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, customErr)
+	// The original parse error should have been passed to the handler.
+	assert.NotNil(t, receivedParseErr)
+	assert.Contains(t, receivedParseErr.Error(), "missing property value for under")
 }
 
 func TestWithPropertyParseErrorHandler_Recover(t *testing.T) {
@@ -725,6 +735,52 @@ END:VCALENDAR
 	// The valid alarm properties should still be there.
 	assert.NotNil(t, alarms[0].GetProperty(ComponentPropertyTrigger))
 	assert.NotNil(t, alarms[0].GetProperty(ComponentPropertyAction))
+}
+
+func TestWithPropertyParseErrorHandler_MultipleConsecutive(t *testing.T) {
+	// Multiple malformed properties in the same component should all be
+	// passed to the handler individually.
+	input := `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+BEGIN:VEVENT
+DTSTART:20240101T120000Z
+X-BAD-ONE;under_score=val:value1
+SUMMARY:Test Event
+X-BAD-TWO;another_bad=yes:value2
+X-BAD-THREE;yet_another=no:value3
+DTEND:20240101T130000Z
+END:VEVENT
+END:VCALENDAR
+`
+	var skippedLines []string
+	var skippedErrors []string
+	cal, err := ParseCalendarWithOptions(strings.NewReader(input),
+		WithPropertyParseErrorHandler(func(rawLine ContentLine, parseErr error) (*BaseProperty, error) {
+			skippedLines = append(skippedLines, string(rawLine))
+			skippedErrors = append(skippedErrors, parseErr.Error())
+			return nil, nil // skip all
+		}),
+	)
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.NotNil(t, cal)
+	assert.Len(t, cal.Events(), 1)
+	// All three malformed properties should have been skipped.
+	assert.Len(t, skippedLines, 3)
+	assert.Contains(t, skippedLines[0], "X-BAD-ONE")
+	assert.Contains(t, skippedLines[1], "X-BAD-TWO")
+	assert.Contains(t, skippedLines[2], "X-BAD-THREE")
+	// Each error should reference the respective malformed param name.
+	assert.Contains(t, skippedErrors[0], "under")
+	assert.Contains(t, skippedErrors[1], "another")
+	assert.Contains(t, skippedErrors[2], "yet")
+	// Valid properties should still be present.
+	ev := cal.Events()[0]
+	assert.Equal(t, "Test Event", ev.GetProperty(ComponentPropertySummary).Value)
+	assert.NotNil(t, ev.GetProperty(ComponentPropertyDtStart))
+	assert.NotNil(t, ev.GetProperty(ComponentPropertyDtEnd))
 }
 
 func BenchmarkSerialize(b *testing.B) {

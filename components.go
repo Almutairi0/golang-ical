@@ -1124,7 +1124,7 @@ func generalParseComponentWithHandler(cs *CalendarStream, startLine *BasePropert
 	case ComponentVEvent:
 		r, rerr := parseComponentWithHandler(cs, startLine, handler)
 		if rerr != nil {
-			return nil, fmt.Errorf("failed to parse event: %w", rerr)
+			return nil, rerr
 		}
 		co = &VEvent{ComponentBase: r}
 	case ComponentVTodo:
