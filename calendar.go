@@ -401,6 +401,7 @@ type Calendar struct {
 	Components                     []Component
 	CalendarProperties             []CalendarProperty
 	unknownCalendarPropertyHandler func(cal *Calendar, state string, cl *BaseProperty) error
+	propertyParseErrorHandler      func(rawLine ContentLine, err error) (*BaseProperty, error)
 }
 
 func NewCalendar() *Calendar {
@@ -691,6 +692,25 @@ func WithUnknownPropertyHandler(f func(*Calendar, string, *BaseProperty) error) 
 	}
 }
 
+// WithPropertyParseErrorHandler allows custom handling of property parse errors.
+// When a content line fails to parse (e.g. due to malformed parameter names),
+// the handler is called with the raw content line and the parse error.
+//
+// The handler can:
+//   - Return (*BaseProperty, nil) to use a recovered/replacement property
+//   - Return (nil, nil) to skip the property silently
+//   - Return (nil, err) to abort parsing with the error
+//
+// Without this option, any property parse error aborts the entire calendar parse.
+// This is useful for real-world ICS feeds that contain non-RFC-compliant properties
+// (e.g. parameter names with underscores).
+func WithPropertyParseErrorHandler(f func(rawLine ContentLine, err error) (*BaseProperty, error)) ParseOption {
+	return func(c *Calendar) error {
+		c.propertyParseErrorHandler = f
+		return nil
+	}
+}
+
 func ParseCalendar(r io.Reader) (*Calendar, error) {
 	// Default behavior maintains backward compatibility (strict mode)
 	return ParseCalendarWithOptions(r)
@@ -728,7 +748,19 @@ func ParseCalendarWithOptions(r io.Reader, options ...any) (*Calendar, error) {
 		}
 		line, err := ParseProperty(*l)
 		if err != nil {
-			return nil, fmt.Errorf("parsing line %d: %w", ln, err)
+			if c.propertyParseErrorHandler != nil {
+				var recovered *BaseProperty
+				recovered, err = c.propertyParseErrorHandler(*l, err)
+				if err != nil {
+					return nil, fmt.Errorf("parsing line %d: %w", ln, err)
+				}
+				if recovered == nil {
+					continue // skip this line
+				}
+				line = recovered
+			} else {
+				return nil, fmt.Errorf("parsing line %d: %w", ln, err)
+			}
 		}
 		if line == nil {
 			return nil, fmt.Errorf("parsing calendar line %d", ln)
@@ -774,7 +806,7 @@ func ParseCalendarWithOptions(r io.Reader, options ...any) (*Calendar, error) {
 					return nil, errors.New("malformed calendar; expected end")
 				}
 			case "BEGIN":
-				co, err := GeneralParseComponent(cs, line)
+				co, err := generalParseComponentWithHandler(cs, line, c.propertyParseErrorHandler)
 				if err != nil {
 					return nil, err
 				}
