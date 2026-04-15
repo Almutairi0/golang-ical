@@ -401,7 +401,7 @@ type Calendar struct {
 	Components                     []Component
 	CalendarProperties             []CalendarProperty
 	unknownCalendarPropertyHandler func(cal *Calendar, state string, cl *BaseProperty) error
-	propertyParseErrorHandler      func(rawLine ContentLine, err error) (*BaseProperty, error)
+	propertyParseErrorHandler      PropertyParseErrorHandler
 }
 
 func NewCalendar() *Calendar {
@@ -704,7 +704,7 @@ func WithUnknownPropertyHandler(f func(*Calendar, string, *BaseProperty) error) 
 // Without this option, any property parse error aborts the entire calendar parse.
 // This is useful for real-world ICS feeds that contain non-RFC-compliant properties
 // (e.g. parameter names with underscores).
-func WithPropertyParseErrorHandler(f func(rawLine ContentLine, err error) (*BaseProperty, error)) ParseOption {
+func WithPropertyParseErrorHandler(f PropertyParseErrorHandler) ParseOption {
 	return func(c *Calendar) error {
 		c.propertyParseErrorHandler = f
 		return nil

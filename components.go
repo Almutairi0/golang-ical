@@ -1118,7 +1118,6 @@ type PropertyParseErrorHandler func(rawLine ContentLine, err error) (*BaseProper
 
 func generalParseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, handler PropertyParseErrorHandler) (Component, error) {
 	var co Component
-	var err error
 	switch ComponentType(startLine.Value) {
 	case ComponentVCalendar:
 		return nil, errors.New("malformed calendar; vcalendar not where expected")
@@ -1177,7 +1176,7 @@ func generalParseComponentWithHandler(cs *CalendarStream, startLine *BasePropert
 		}
 		co = &GeneralComponent{ComponentBase: r, Token: startLine.Value}
 	}
-	return co, err
+	return co, nil
 }
 
 func ParseVEvent(cs *CalendarStream, startLine *BaseProperty) *VEvent {
