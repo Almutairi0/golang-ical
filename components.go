@@ -301,7 +301,7 @@ func parseTimeValue(timeVal string, params map[string][]string, expectAllDay boo
 			return time.Time{}, errors.New("expected only one TZID")
 		}
 		var tzErr error
-		propLoc, tzErr = resolveTimezone(tzId[0])
+		propLoc, tzErr = resolveTimezone(tzId[0], windowsTimezoneMapping)
 		if tzErr != nil {
 			return time.Time{}, tzErr
 		}

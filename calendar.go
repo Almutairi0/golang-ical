@@ -691,6 +691,20 @@ func WithUnknownPropertyHandler(f func(*Calendar, string, *BaseProperty) error) 
 	}
 }
 
+// windowsTimezoneMapping controls whether Windows timezone names (e.g.
+// "Eastern Standard Time") are automatically mapped to IANA equivalents
+// when parsing TZID parameters. Disabled by default for backward compatibility.
+var windowsTimezoneMapping bool
+
+// WithWindowsTimezoneMapping enables mapping of Windows timezone names to
+// IANA equivalents during calendar parsing.
+func WithWindowsTimezoneMapping() ParseOption {
+	return func(c *Calendar) error {
+		windowsTimezoneMapping = true
+		return nil
+	}
+}
+
 func ParseCalendar(r io.Reader) (*Calendar, error) {
 	// Default behavior maintains backward compatibility (strict mode)
 	return ParseCalendarWithOptions(r)

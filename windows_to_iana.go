@@ -145,15 +145,13 @@ var windowsToIANA = map[string]string{
 }
 
 // resolveTimezone attempts to load a time.Location for the given TZID string.
-// If the TZID is a Windows timezone name, it is mapped to the corresponding
-// IANA timezone name before loading.
-func resolveTimezone(tzid string) (*time.Location, error) {
-	loc, err := time.LoadLocation(tzid)
-	if err == nil {
-		return loc, nil
+// When enableWindowsMapping is true, Windows timezone names are mapped to
+// their IANA equivalents using the windowsToIANA table before loading.
+func resolveTimezone(tzid string, enableWindowsMapping ...bool) (*time.Location, error) {
+	if len(enableWindowsMapping) > 0 && enableWindowsMapping[0] {
+		if iana, ok := windowsToIANA[tzid]; ok {
+			return time.LoadLocation(iana)
+		}
 	}
-	if iana, ok := windowsToIANA[tzid]; ok {
-		return time.LoadLocation(iana)
-	}
-	return nil, err
+	return time.LoadLocation(tzid)
 }
