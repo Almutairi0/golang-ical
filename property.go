@@ -287,6 +287,11 @@ type ContentLine string
 // It receives the raw content line and can either recover, skip, or abort.
 type PropertyParser func(rawLine ContentLine) (*BaseProperty, error)
 
+// ParseProperty parses a single RFC5545 content line using strict parsing rules.
+func ParseProperty(contentLine ContentLine) (*BaseProperty, error) {
+	return parseProperty(contentLine)
+}
+
 // SkipPropertyParser is an alternative to the default strict parser path used by ParseCalendar and ParseComponent.
 // It returns parsed properties when the line is valid and skips malformed lines.
 func SkipPropertyParser(rawLine ContentLine) (*BaseProperty, error) {

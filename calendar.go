@@ -716,7 +716,7 @@ func WithUnknownPropertyHandler(f func(*Calendar, string, *BaseProperty) error) 
 // WithPropertyParser allows custom handling of property parse errors.
 // It is a convenience wrapper; ParseCalendarWithOptions also accepts PropertyParser directly.
 // When a content line fails to parse (e.g. due to malformed parameter names),
-// the parser is called with the raw content line and the parse error.
+// the parser is called with the raw content line.
 //
 // The parser can:
 //   - Return (*BaseProperty, nil) to use a recovered/replacement property
@@ -741,7 +741,7 @@ func NewCalendarWithOptions(options ...any) (*Calendar, error) {
 		unknownCalendarPropertyHandler: DefaultUnknownCalendarPropertyHandler,
 		propertyParser:                 parseProperty,
 	}
-	for _, opt := range options {
+	for i, opt := range options {
 		switch opt := opt.(type) {
 		case CalendarOption:
 			if err := opt(c); err != nil {
@@ -759,6 +759,8 @@ func NewCalendarWithOptions(options ...any) (*Calendar, error) {
 			if opt != nil {
 				c.propertyParser = PropertyParser(opt)
 			}
+		default:
+			return nil, fmt.Errorf("invalid parse option type at index %d: %T", i, opt)
 		}
 	}
 	return c, nil

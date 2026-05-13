@@ -5,6 +5,7 @@ import (
 	"embed"
 	_ "embed"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
@@ -848,6 +849,67 @@ END:VCALENDAR
 	assert.Equal(t, "Test Event", ev.GetProperty(ComponentPropertySummary).Value)
 	assert.NotNil(t, ev.GetProperty(ComponentPropertyDtStart))
 	assert.NotNil(t, ev.GetProperty(ComponentPropertyDtEnd))
+}
+
+func TestParseCalendarWithOptions_InvalidOptionType(t *testing.T) {
+	input := `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+END:VCALENDAR
+`
+
+	_, err := ParseCalendarWithOptions(strings.NewReader(input), 42)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "invalid parse option type")
+	}
+}
+
+func TestNewCalendarWithOptions_InvalidOptionType(t *testing.T) {
+	_, err := NewCalendarWithOptions(42)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "invalid parse option type")
+	}
+}
+
+func TestParseProperty_ExportedStrict(t *testing.T) {
+	line, err := ParseProperty(ContentLine("SUMMARY:ok"))
+	if !assert.NoError(t, err) {
+		return
+	}
+	if assert.NotNil(t, line) {
+		assert.Equal(t, "SUMMARY", line.IANAToken)
+		assert.Equal(t, "ok", line.Value)
+	}
+
+	_, err = ParseProperty(ContentLine("X-BAD;under_score=val:value"))
+	assert.Error(t, err)
+}
+
+func TestErrPropertySkippedBehavior(t *testing.T) {
+	parser := func(rawLine ContentLine) (*BaseProperty, error) {
+		if strings.Contains(string(rawLine), "X-SKIP") {
+			return nil, fmt.Errorf("%w: intentional", ErrPropertySkipped)
+		}
+		return parseProperty(rawLine)
+	}
+
+	input := `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+X-SKIP:1
+BEGIN:VEVENT
+SUMMARY:ok
+X-SKIP:2
+END:VEVENT
+END:VCALENDAR
+`
+
+	cal, err := ParseCalendarWithOptions(strings.NewReader(input), parser)
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Len(t, cal.Events(), 1)
+	assert.Equal(t, "ok", cal.Events()[0].GetProperty(ComponentPropertySummary).Value)
 }
 
 func BenchmarkSerialize(b *testing.B) {
