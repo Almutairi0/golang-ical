@@ -737,6 +737,89 @@ END:VCALENDAR
 	assert.NotNil(t, alarms[0].GetProperty(ComponentPropertyAction))
 }
 
+func TestWithPropertyParseErrorHandler_CalendarLevelRecover(t *testing.T) {
+	input := `BEGIN:VCALENDAR
+VERSION:2.0
+X-BAD-CAL;under_score=val:cal-value
+PRODID:-//Test//Test//EN
+END:VCALENDAR
+`
+
+	cal, err := ParseCalendarWithOptions(strings.NewReader(input),
+		WithPropertyParseErrorHandler(func(rawLine ContentLine, parseErr error) (*BaseProperty, error) {
+			s := string(rawLine)
+			colonIdx := strings.Index(s, ":")
+			semiIdx := strings.Index(s, ";")
+			if colonIdx > 0 && semiIdx > 0 && semiIdx < colonIdx {
+				return &BaseProperty{
+					IANAToken:      s[:semiIdx],
+					Value:          s[colonIdx+1:],
+					ICalParameters: map[string][]string{},
+				}, nil
+			}
+			return nil, nil
+		}),
+	)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	found := false
+	for _, p := range cal.CalendarProperties {
+		if p.IANAToken == "X-BAD-CAL" {
+			found = true
+			assert.Equal(t, "cal-value", p.Value)
+		}
+	}
+	assert.True(t, found, "expected recovered calendar-level property")
+}
+
+func TestWithPropertyParseErrorHandler_NestedComponentRecover(t *testing.T) {
+	input := `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+BEGIN:VEVENT
+DTSTART:20240101T120000Z
+SUMMARY:Test Event
+BEGIN:VALARM
+TRIGGER:-PT15M
+ACTION:DISPLAY
+X-ALARM-BAD;under_score=val:alarm-value
+DESCRIPTION:Reminder
+END:VALARM
+END:VEVENT
+END:VCALENDAR
+`
+
+	cal, err := ParseCalendarWithOptions(strings.NewReader(input),
+		WithPropertyParseErrorHandler(func(rawLine ContentLine, parseErr error) (*BaseProperty, error) {
+			s := string(rawLine)
+			colonIdx := strings.Index(s, ":")
+			semiIdx := strings.Index(s, ";")
+			if colonIdx > 0 && semiIdx > 0 && semiIdx < colonIdx {
+				return &BaseProperty{
+					IANAToken:      s[:semiIdx],
+					Value:          s[colonIdx+1:],
+					ICalParameters: map[string][]string{},
+				}, nil
+			}
+			return nil, nil
+		}),
+	)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	events := cal.Events()
+	assert.Len(t, events, 1)
+	alarms := events[0].Alarms()
+	assert.Len(t, alarms, 1)
+	recovered := alarms[0].GetProperty("X-ALARM-BAD")
+	if assert.NotNil(t, recovered) {
+		assert.Equal(t, "alarm-value", recovered.Value)
+	}
+}
+
 func TestWithPropertyParseErrorHandler_MultipleConsecutive(t *testing.T) {
 	// Multiple malformed properties in the same component should all be
 	// passed to the handler individually.
