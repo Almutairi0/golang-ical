@@ -283,40 +283,70 @@ func init() {
 
 type ContentLine string
 
+// PropertyParseErrorHandler is a function that handles property parse errors.
+// It receives the raw content line and the parse error.
+//
+// Return values:
+//   - (*BaseProperty, nil): use the returned property as a replacement
+//   - (nil, nil): skip this property silently
+//   - (nil, err): abort parsing with the given error
+type PropertyParseErrorHandler func(rawLine ContentLine, err error) (*BaseProperty, error)
+
 func ParseProperty(contentLine ContentLine) (*BaseProperty, error) {
+	line, _, err := parseProperty(contentLine, nil)
+	return line, err
+}
+
+func parseProperty(contentLine ContentLine, handler PropertyParseErrorHandler) (*BaseProperty, bool, error) {
 	r := &BaseProperty{
 		ICalParameters: map[string][]string{},
 	}
 	tokenPos := propertyIanaTokenReg.FindIndex([]byte(contentLine))
 	if tokenPos == nil {
-		return nil, nil
+		return nil, false, nil
 	}
 	p := 0
 	r.IANAToken = string(contentLine[p+tokenPos[0] : p+tokenPos[1]])
 	p += tokenPos[1]
 	for {
 		if p >= len(contentLine) {
-			return nil, nil
+			return nil, false, nil
 		}
 		switch rune(contentLine[p]) {
 		case ':':
-			return parsePropertyValue(r, string(contentLine), p+1), nil
+			return parsePropertyValue(r, string(contentLine), p+1), false, nil
 		case ';':
 			var np int
 			var err error
 			t := r.IANAToken
 			r, np, err = parsePropertyParam(r, string(contentLine), p+1)
 			if err != nil {
-				return nil, fmt.Errorf("parsing property %s: %w", t, err)
+				parseErr := fmt.Errorf("parsing property %s: %w", t, err)
+				return recoverProperty(contentLine, parseErr, handler)
 			}
 			if r == nil {
-				return nil, nil
+				return nil, false, nil
 			}
 			p = np
 		default:
-			return nil, nil
+			return nil, false, nil
 		}
 	}
+}
+
+func recoverProperty(contentLine ContentLine, parseErr error, handler PropertyParseErrorHandler) (*BaseProperty, bool, error) {
+	if handler == nil {
+		return nil, false, parseErr
+	}
+
+	recovered, err := handler(contentLine, parseErr)
+	if err != nil {
+		return nil, false, err
+	}
+	if recovered == nil {
+		return nil, true, nil
+	}
+	return recovered, false, nil
 }
 
 func parsePropertyParam(r *BaseProperty, contentLine string, p int) (*BaseProperty, int, error) {

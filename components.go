@@ -1107,15 +1107,6 @@ func GeneralParseComponent(cs *CalendarStream, startLine *BaseProperty) (Compone
 	return generalParseComponentWithHandler(cs, startLine, nil)
 }
 
-// PropertyParseErrorHandler is a function that handles property parse errors.
-// It receives the raw content line and the parse error.
-//
-// Return values:
-//   - (*BaseProperty, nil): use the returned property as a replacement
-//   - (nil, nil): skip this property silently
-//   - (nil, err): abort parsing with the given error
-type PropertyParseErrorHandler func(rawLine ContentLine, err error) (*BaseProperty, error)
-
 func generalParseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, handler PropertyParseErrorHandler) (Component, error) {
 	var co Component
 	switch ComponentType(startLine.Value) {
@@ -1344,21 +1335,12 @@ func parseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, hand
 		if l == nil || len(*l) == 0 {
 			continue
 		}
-		line, err := ParseProperty(*l)
+		line, skip, err := parseProperty(*l, handler)
 		if err != nil {
-			if handler != nil {
-				var recovered *BaseProperty
-				recovered, err = handler(*l, err)
-				if err != nil {
-					return cb, fmt.Errorf("parsing component property %d: %w", ln, err)
-				}
-				if recovered == nil {
-					continue // skip this property
-				}
-				line = recovered
-			} else {
-				return cb, fmt.Errorf("parsing component property %d: %w", ln, err)
-			}
+			return cb, fmt.Errorf("parsing component property %d: %w", ln, err)
+		}
+		if skip {
+			continue
 		}
 		if line == nil {
 			return cb, errors.New("parsing component line")

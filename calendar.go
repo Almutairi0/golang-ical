@@ -746,21 +746,12 @@ func ParseCalendarWithOptions(r io.Reader, options ...any) (*Calendar, error) {
 		if l == nil || len(*l) == 0 {
 			continue
 		}
-		line, err := ParseProperty(*l)
+		line, skip, err := parseProperty(*l, c.propertyParseErrorHandler)
 		if err != nil {
-			if c.propertyParseErrorHandler != nil {
-				var recovered *BaseProperty
-				recovered, err = c.propertyParseErrorHandler(*l, err)
-				if err != nil {
-					return nil, fmt.Errorf("parsing line %d: %w", ln, err)
-				}
-				if recovered == nil {
-					continue // skip this line
-				}
-				line = recovered
-			} else {
-				return nil, fmt.Errorf("parsing line %d: %w", ln, err)
-			}
+			return nil, fmt.Errorf("parsing line %d: %w", ln, err)
+		}
+		if skip {
+			continue
 		}
 		if line == nil {
 			return nil, fmt.Errorf("parsing calendar line %d", ln)
