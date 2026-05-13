@@ -310,7 +310,7 @@ func LooseParser(rawLine ContentLine) (*BaseProperty, error) {
 			ICalParameters: map[string][]string{},
 		}, nil
 	}
-	return nil, nil
+	return nil, fmt.Errorf("%w: unable to recover property", ErrPropertySkipped)
 }
 
 // FallbackParser builds an alternative to the default strict parser path used by ParseCalendar and ParseComponent.
@@ -328,13 +328,16 @@ func FallbackParser(fallback PropertyParser, fallbacks ...PropertyParser) Proper
 			}
 			line, err := p(rawLine)
 			if err != nil {
+				if errors.Is(err, ErrPropertySkipped) {
+					continue
+				}
 				return nil, err
 			}
 			if line != nil {
 				return line, nil
 			}
 		}
-		return nil, nil
+		return nil, fmt.Errorf("%w: %v", ErrPropertySkipped, err)
 	}
 }
 

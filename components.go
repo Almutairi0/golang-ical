@@ -1104,7 +1104,7 @@ func (general *GeneralComponent) SerializeTo(w io.Writer, serialConfig *Serializ
 }
 
 func GeneralParseComponent(cs *CalendarStream, startLine *BaseProperty) (Component, error) {
-	return generalParseComponentWithHandler(cs, startLine)
+	return generalParseComponentWithHandler(cs, startLine, parseProperty)
 }
 
 func GeneralParseComponentWithOptions(cs *CalendarStream, startLine *BaseProperty, opts ...any) (Component, error) {
@@ -1112,60 +1112,73 @@ func GeneralParseComponentWithOptions(cs *CalendarStream, startLine *BasePropert
 }
 
 func generalParseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts ...any) (Component, error) {
+	parser := parseProperty
+	for _, opt := range opts {
+		switch opt := opt.(type) {
+		case PropertyParser:
+			if opt != nil {
+				parser = opt
+			}
+		case func(ContentLine) (*BaseProperty, error):
+			if opt != nil {
+				parser = PropertyParser(opt)
+			}
+		}
+	}
 	var co Component
 	switch ComponentType(startLine.Value) {
 	case ComponentVCalendar:
 		return nil, errors.New("malformed calendar; vcalendar not where expected")
 	case ComponentVEvent:
-		r, rerr := parseComponentWithHandler(cs, startLine, opts...)
+		r, rerr := parseComponentWithHandler(cs, startLine, parser)
 		if rerr != nil {
 			return nil, rerr
 		}
 		co = &VEvent{ComponentBase: r}
 	case ComponentVTodo:
-		r, rerr := parseComponentWithHandler(cs, startLine, opts...)
+		r, rerr := parseComponentWithHandler(cs, startLine, parser)
 		if rerr != nil {
 			return nil, rerr
 		}
 		co = &VTodo{ComponentBase: r}
 	case ComponentVJournal:
-		r, rerr := parseComponentWithHandler(cs, startLine, opts...)
+		r, rerr := parseComponentWithHandler(cs, startLine, parser)
 		if rerr != nil {
 			return nil, rerr
 		}
 		co = &VJournal{ComponentBase: r}
 	case ComponentVFreeBusy:
-		r, rerr := parseComponentWithHandler(cs, startLine, opts...)
+		r, rerr := parseComponentWithHandler(cs, startLine, parser)
 		if rerr != nil {
 			return nil, rerr
 		}
 		co = &VBusy{ComponentBase: r}
 	case ComponentVTimezone:
-		r, rerr := parseComponentWithHandler(cs, startLine, opts...)
+		r, rerr := parseComponentWithHandler(cs, startLine, parser)
 		if rerr != nil {
 			return nil, rerr
 		}
 		co = &VTimezone{ComponentBase: r}
 	case ComponentVAlarm:
-		r, rerr := parseComponentWithHandler(cs, startLine, opts...)
+		r, rerr := parseComponentWithHandler(cs, startLine, parser)
 		if rerr != nil {
 			return nil, rerr
 		}
 		co = &VAlarm{ComponentBase: r}
 	case ComponentStandard:
-		r, rerr := parseComponentWithHandler(cs, startLine, opts...)
+		r, rerr := parseComponentWithHandler(cs, startLine, parser)
 		if rerr != nil {
 			return nil, rerr
 		}
 		co = &Standard{ComponentBase: r}
 	case ComponentDaylight:
-		r, rerr := parseComponentWithHandler(cs, startLine, opts...)
+		r, rerr := parseComponentWithHandler(cs, startLine, parser)
 		if rerr != nil {
 			return nil, rerr
 		}
 		co = &Daylight{ComponentBase: r}
 	default:
-		r, rerr := parseComponentWithHandler(cs, startLine, opts...)
+		r, rerr := parseComponentWithHandler(cs, startLine, parser)
 		if rerr != nil {
 			return nil, rerr
 		}
@@ -1328,7 +1341,6 @@ func ParseComponentWithOptions(cs *CalendarStream, startLine *BaseProperty, opts
 }
 
 func parseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts ...any) (ComponentBase, error) {
-	cb := ComponentBase{}
 	parser := parseProperty
 	for _, opt := range opts {
 		switch opt := opt.(type) {
@@ -1342,6 +1354,7 @@ func parseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts
 			}
 		}
 	}
+	cb := ComponentBase{}
 	cont := true
 	for ln := 0; cont; ln++ {
 		l, err := cs.ReadLine()
@@ -1358,6 +1371,9 @@ func parseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts
 		}
 		line, err := parser(*l)
 		if err != nil {
+			if errors.Is(err, ErrPropertySkipped) {
+				continue
+			}
 			return cb, fmt.Errorf("parsing component property %d: %w", ln, err)
 		}
 		if line == nil {
@@ -1372,7 +1388,7 @@ func parseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts
 				return cb, errors.New("unbalanced end")
 			}
 		case "BEGIN":
-			co, err := generalParseComponentWithHandler(cs, line, opts...)
+			co, err := generalParseComponentWithHandler(cs, line, parser)
 			if err != nil {
 				return cb, err
 			}

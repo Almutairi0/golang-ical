@@ -405,16 +405,18 @@ type Calendar struct {
 }
 
 func NewCalendar() *Calendar {
-	return NewCalendarFor("arran4")
+	c, _ := NewCalendarWithOptions(
+		WithVersion("2.0"),
+		WithProductId("-//arran4//Golang ICS Library"),
+	)
+	return c
 }
 
 func NewCalendarFor(service string) *Calendar {
-	c := &Calendar{
-		Components:         []Component{},
-		CalendarProperties: []CalendarProperty{},
-	}
-	c.SetVersion("2.0")
-	c.SetProductId("-//" + service + "//Golang ICS Library")
+	c, _ := NewCalendarWithOptions(
+		WithVersion("2.0"),
+		WithProductId("-//"+service+"//Golang ICS Library"),
+	)
 	return c
 }
 
@@ -684,6 +686,25 @@ func parseCalendarFromHttpRequest(client HttpClientLike, request *http.Request) 
 // ParseOption provides functional options for ParseCalendar
 type ParseOption func(*Calendar) error
 
+// CalendarOption provides functional options for Calendar construction.
+type CalendarOption func(*Calendar) error
+
+// WithVersion sets the calendar version.
+func WithVersion(version string, params ...PropertyParameter) CalendarOption {
+	return func(c *Calendar) error {
+		c.SetVersion(version, params...)
+		return nil
+	}
+}
+
+// WithProductId sets the calendar product identifier.
+func WithProductId(productID string, params ...PropertyParameter) CalendarOption {
+	return func(c *Calendar) error {
+		c.SetProductId(productID, params...)
+		return nil
+	}
+}
+
 // WithUnknownPropertyHandler allows custom handling of unknown properties
 func WithUnknownPropertyHandler(f func(*Calendar, string, *BaseProperty) error) ParseOption {
 	return func(c *Calendar) error {
@@ -712,6 +733,37 @@ func WithPropertyParser(f PropertyParser) ParseOption {
 	}
 }
 
+// NewCalendarWithOptions constructs a calendar with sane parser defaults and optional overrides.
+func NewCalendarWithOptions(options ...any) (*Calendar, error) {
+	c := &Calendar{
+		Components:                     []Component{},
+		CalendarProperties:             []CalendarProperty{},
+		unknownCalendarPropertyHandler: DefaultUnknownCalendarPropertyHandler,
+		propertyParser:                 parseProperty,
+	}
+	for _, opt := range options {
+		switch opt := opt.(type) {
+		case CalendarOption:
+			if err := opt(c); err != nil {
+				return nil, err
+			}
+		case ParseOption:
+			if err := opt(c); err != nil {
+				return nil, err
+			}
+		case PropertyParser:
+			if opt != nil {
+				c.propertyParser = opt
+			}
+		case func(ContentLine) (*BaseProperty, error):
+			if opt != nil {
+				c.propertyParser = PropertyParser(opt)
+			}
+		}
+	}
+	return c, nil
+}
+
 func ParseCalendar(r io.Reader) (*Calendar, error) {
 	// Default behavior maintains backward compatibility (strict mode)
 	return ParseCalendarWithOptions(r)
@@ -719,28 +771,11 @@ func ParseCalendar(r io.Reader) (*Calendar, error) {
 
 func ParseCalendarWithOptions(r io.Reader, options ...any) (*Calendar, error) {
 	state := "begin"
-	c := &Calendar{
-		unknownCalendarPropertyHandler: DefaultUnknownCalendarPropertyHandler,
-	}
-	for _, opt := range options {
-		switch opt := opt.(type) {
-		case ParseOption:
-			if err := opt(c); err != nil {
-				return nil, fmt.Errorf("invalid parse option: %w", err)
-			}
-		case PropertyParser:
-			c.propertyParser = opt
-		case func(ContentLine) (*BaseProperty, error):
-			c.propertyParser = PropertyParser(opt)
-		default:
-			return nil, fmt.Errorf("invalid parse option type: %T", opt)
-		}
+	c, err := NewCalendarWithOptions(options...)
+	if err != nil {
+		return nil, err
 	}
 	cs := NewCalendarStream(r)
-	parser := parseProperty
-	if c.propertyParser != nil {
-		parser = c.propertyParser
-	}
 	cont := true
 	for ln := 0; cont; ln++ {
 		l, err := cs.ReadLine()
@@ -755,8 +790,11 @@ func ParseCalendarWithOptions(r io.Reader, options ...any) (*Calendar, error) {
 		if l == nil || len(*l) == 0 {
 			continue
 		}
-		line, err := parser(*l)
+		line, err := c.propertyParser(*l)
 		if err != nil {
+			if errors.Is(err, ErrPropertySkipped) {
+				continue
+			}
 			return nil, fmt.Errorf("parsing line %d: %w", ln, err)
 		}
 		if line == nil {
