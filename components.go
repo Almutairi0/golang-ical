@@ -1125,7 +1125,7 @@ func generalParseComponentWithHandler(cs *CalendarStream, startLine *BasePropert
 				parser = PropertyParser(opt)
 			}
 		default:
-			return co, fmt.Errorf("invalid option type at index %d: %T", i, opt)
+			return co, fmt.Errorf("%w %d: %T", ErrInvalidOpArg, i, opt)
 		}
 	}
 	switch ComponentType(startLine.Value) {
@@ -1356,7 +1356,7 @@ func parseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts
 				parser = PropertyParser(opt)
 			}
 		default:
-			return cb, fmt.Errorf("invalid option type at index %d: %T", i, opt)
+			return cb, fmt.Errorf("%w %d: %T", ErrInvalidOpArg, i, opt)
 		}
 	}
 	cont := true

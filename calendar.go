@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"reflect"
 	"strings"
 	"time"
 )
@@ -471,7 +470,7 @@ func parseSerializeOps(ops []any) (*SerializationConfiguration, error) {
 		case error:
 			return nil, op
 		default:
-			return nil, fmt.Errorf("unknown op %d of type %s", opi, reflect.TypeOf(op))
+			return nil, fmt.Errorf("%w %d: %T", ErrInvalidOpArg, opi, op)
 		}
 	}
 	return serializeConfig, nil
@@ -647,7 +646,7 @@ func ParseCalendarFromUrl(url string, opts ...any) (*Calendar, error) {
 		case func() context.Context:
 			ctx = opt()
 		default:
-			return nil, fmt.Errorf("unknown optional argument %d on ParseCalendarFromUrl: %s", opti, reflect.TypeOf(opt))
+			return nil, fmt.Errorf("%w %d: %T", ErrInvalidOpArg, opti, opt)
 		}
 	}
 	if ctx == nil {
@@ -762,7 +761,7 @@ func NewCalendarWithOptions(options ...any) (*Calendar, error) {
 				c.propertyParser = PropertyParser(opt)
 			}
 		default:
-			return nil, fmt.Errorf("invalid parse option type at index %d: %T", i, opt)
+			return nil, fmt.Errorf("%w %d: %T", ErrInvalidOpArg, i, opt)
 		}
 	}
 	return c, nil

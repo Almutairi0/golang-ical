@@ -323,6 +323,10 @@ func LooseParser(rawLine ContentLine) (*BaseProperty, error) {
 func FallbackParser(fallback PropertyParser, fallbacks ...PropertyParser) PropertyParser {
 	parsers := append([]PropertyParser{fallback}, fallbacks...)
 	return func(rawLine ContentLine) (*BaseProperty, error) {
+		line, err := parseProperty(rawLine)
+		if err == nil {
+			return line, nil
+		}
 		for _, p := range parsers {
 			if p == nil {
 				continue

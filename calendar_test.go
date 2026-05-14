@@ -860,14 +860,46 @@ END:VCALENDAR
 
 	_, err := ParseCalendarWithOptions(strings.NewReader(input), 42)
 	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "invalid parse option type")
+		assert.ErrorIs(t, err, ErrInvalidOpArg)
+		assert.Contains(t, err.Error(), "0")
 	}
 }
 
 func TestNewCalendarWithOptions_InvalidOptionType(t *testing.T) {
 	_, err := NewCalendarWithOptions(42)
 	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "invalid parse option type")
+		assert.ErrorIs(t, err, ErrInvalidOpArg)
+		assert.Contains(t, err.Error(), "0")
+	}
+}
+
+func TestParseCalendarFromUrl_InvalidOptionType(t *testing.T) {
+	_, err := ParseCalendarFromUrl("https://example.com", 42)
+	if assert.Error(t, err) {
+		assert.ErrorIs(t, err, ErrInvalidOpArg)
+		assert.Contains(t, err.Error(), "0")
+	}
+}
+
+func TestComponentParseWithOptions_InvalidOptionType(t *testing.T) {
+	_, err := ParseComponentWithOptions(nil, nil, 42)
+	if assert.Error(t, err) {
+		assert.ErrorIs(t, err, ErrInvalidOpArg)
+		assert.Contains(t, err.Error(), "0")
+	}
+
+	_, err = GeneralParseComponentWithOptions(nil, nil, 42)
+	if assert.Error(t, err) {
+		assert.ErrorIs(t, err, ErrInvalidOpArg)
+		assert.Contains(t, err.Error(), "0")
+	}
+}
+
+func TestSerialize_InvalidOptionType(t *testing.T) {
+	_, err := parseSerializeOps([]any{42})
+	if assert.Error(t, err) {
+		assert.ErrorIs(t, err, ErrInvalidOpArg)
+		assert.Contains(t, err.Error(), "0")
 	}
 }
 
