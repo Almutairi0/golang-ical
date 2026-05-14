@@ -1113,7 +1113,8 @@ func GeneralParseComponentWithOptions(cs *CalendarStream, startLine *BasePropert
 
 func generalParseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts ...any) (Component, error) {
 	parser := parseProperty
-	for _, opt := range opts {
+	var co Component
+	for i, opt := range opts {
 		switch opt := opt.(type) {
 		case PropertyParser:
 			if opt != nil {
@@ -1123,9 +1124,10 @@ func generalParseComponentWithHandler(cs *CalendarStream, startLine *BasePropert
 			if opt != nil {
 				parser = PropertyParser(opt)
 			}
+		default:
+			return co, fmt.Errorf("invalid option type at index %d: %T", i, opt)
 		}
 	}
-	var co Component
 	switch ComponentType(startLine.Value) {
 	case ComponentVCalendar:
 		return nil, errors.New("malformed calendar; vcalendar not where expected")
