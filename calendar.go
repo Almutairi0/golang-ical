@@ -728,7 +728,9 @@ func WithUnknownPropertyHandler(f func(*Calendar, string, *BaseProperty) error) 
 // (e.g. parameter names with underscores).
 func WithPropertyParser(f PropertyParser) ParseOption {
 	return func(c *Calendar) error {
-		c.propertyParser = f
+		if f != nil {
+			c.propertyParser = f
+		}
 		return nil
 	}
 }
