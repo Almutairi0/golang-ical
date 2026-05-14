@@ -321,12 +321,8 @@ func LooseParser(rawLine ContentLine) (*BaseProperty, error) {
 // FallbackParser builds an alternative to the default strict parser path used by ParseCalendar and ParseComponent.
 // It tries the strict parser first, then each supplied fallback parser in order.
 func FallbackParser(fallback PropertyParser, fallbacks ...PropertyParser) PropertyParser {
+	parsers := append([]PropertyParser{fallback}, fallbacks...)
 	return func(rawLine ContentLine) (*BaseProperty, error) {
-		line, err := parseProperty(rawLine)
-		if err == nil {
-			return line, nil
-		}
-		parsers := append([]PropertyParser{fallback}, fallbacks...)
 		for _, p := range parsers {
 			if p == nil {
 				continue
@@ -342,7 +338,7 @@ func FallbackParser(fallback PropertyParser, fallbacks ...PropertyParser) Proper
 				return line, nil
 			}
 		}
-		return nil, fmt.Errorf("%w: %v", ErrPropertySkipped, err)
+		return nil, fmt.Errorf("%w: no capable parsers found", ErrPropertySkipped)
 	}
 }
 
