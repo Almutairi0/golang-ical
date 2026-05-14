@@ -1342,6 +1342,7 @@ func ParseComponentWithOptions(cs *CalendarStream, startLine *BaseProperty, opts
 
 func parseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts ...any) (ComponentBase, error) {
 	parser := parseProperty
+	cb := ComponentBase{}
 	for i, opt := range opts {
 		switch opt := opt.(type) {
 		case PropertyParser:
@@ -1356,7 +1357,6 @@ func parseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts
 			return cb, fmt.Errorf("invalid option type at index %d: %T", i, opt)
 		}
 	}
-	cb := ComponentBase{}
 	cont := true
 	for ln := 0; cont; ln++ {
 		l, err := cs.ReadLine()
