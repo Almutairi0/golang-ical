@@ -1112,21 +1112,10 @@ func GeneralParseComponentWithOptions(cs *CalendarStream, startLine *BasePropert
 }
 
 func generalParseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts ...any) (Component, error) {
-	parser := parseProperty
+	parser, err := parsePropertyParserOptions(parseProperty, opts...)
 	var co Component
-	for i, opt := range opts {
-		switch opt := opt.(type) {
-		case PropertyParser:
-			if opt != nil {
-				parser = opt
-			}
-		case func(ContentLine) (*BaseProperty, error):
-			if opt != nil {
-				parser = PropertyParser(opt)
-			}
-		default:
-			return co, fmt.Errorf("%w %d: %T", ErrInvalidOpArg, i, opt)
-		}
+	if err != nil {
+		return co, err
 	}
 	switch ComponentType(startLine.Value) {
 	case ComponentVCalendar:
@@ -1343,21 +1332,10 @@ func ParseComponentWithOptions(cs *CalendarStream, startLine *BaseProperty, opts
 }
 
 func parseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts ...any) (ComponentBase, error) {
-	parser := parseProperty
+	parser, err := parsePropertyParserOptions(parseProperty, opts...)
 	cb := ComponentBase{}
-	for i, opt := range opts {
-		switch opt := opt.(type) {
-		case PropertyParser:
-			if opt != nil {
-				parser = opt
-			}
-		case func(ContentLine) (*BaseProperty, error):
-			if opt != nil {
-				parser = PropertyParser(opt)
-			}
-		default:
-			return cb, fmt.Errorf("%w %d: %T", ErrInvalidOpArg, i, opt)
-		}
+	if err != nil {
+		return cb, err
 	}
 	cont := true
 	for ln := 0; cont; ln++ {
