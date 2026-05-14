@@ -307,15 +307,18 @@ func SkipPropertyParser(rawLine ContentLine) (*BaseProperty, error) {
 func LooseParser(rawLine ContentLine) (*BaseProperty, error) {
 	s := string(rawLine)
 	colonIdx := strings.Index(s, ":")
-	semiIdx := strings.Index(s, ";")
-	if colonIdx > 0 && semiIdx > 0 && semiIdx < colonIdx {
-		return &BaseProperty{
-			IANAToken:      s[:semiIdx],
-			Value:          s[colonIdx+1:],
-			ICalParameters: map[string][]string{},
-		}, nil
+	if colonIdx <= 0 {
+		return nil, fmt.Errorf("%w: unable to recover property (no colon)", ErrPropertySkipped)
 	}
-	return nil, fmt.Errorf("%w: unable to recover property", ErrPropertySkipped)
+	tokenEnd := colonIdx
+	if semiIdx := strings.Index(s, ";"); semiIdx > 0 && semiIdx < colonIdx {
+		tokenEnd = semiIdx
+	}
+	return &BaseProperty{
+		IANAToken:      s[:tokenEnd],
+		Value:          s[colonIdx+1:],
+		ICalParameters: map[string][]string{},
+	}, nil
 }
 
 // FallbackParser builds an alternative to the default strict parser path used by ParseCalendar and ParseComponent.
