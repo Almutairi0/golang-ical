@@ -1,7 +1,6 @@
 package ics
 
 import (
-	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -44,9 +43,9 @@ func (cb *ComponentBase) SubComponents() []Component {
 }
 
 func (cb *ComponentBase) serializeThis(writer io.Writer, componentType ComponentType, serialConfig *SerializationConfiguration) error {
-	_, _ = fmt.Fprint(writer, "BEGIN:"+componentType, serialConfig.NewLine)
+	_, _ = io.WriteString(writer, "BEGIN:"+string(componentType)+serialConfig.NewLine)
 	for _, p := range cb.Properties {
-		err := p.serialize(writer, serialConfig)
+		err := p.SerializeTo(writer, serialConfig)
 		if err != nil {
 			return err
 		}
@@ -57,7 +56,7 @@ func (cb *ComponentBase) serializeThis(writer io.Writer, componentType Component
 			return err
 		}
 	}
-	_, err := fmt.Fprint(writer, "END:"+componentType, serialConfig.NewLine)
+	_, err := io.WriteString(writer, "END:"+string(componentType)+serialConfig.NewLine)
 	return err
 }
 
@@ -280,7 +279,12 @@ func (cb *ComponentBase) getTimeProp(componentProperty ComponentProperty, expect
 		return time.Time{}, fmt.Errorf("%w: %s", ErrorPropertyNotFound, componentProperty)
 	}
 
-	timeVal := timeProp.BaseProperty.Value
+	return parseTimeValue(timeProp.BaseProperty.Value, timeProp.ICalParameters, expectAllDay)
+}
+
+// parseTimeValue parses a single iCal time value string with the given parameters.
+// This is the core time parsing logic shared by getTimeProp and multi-value time getters.
+func parseTimeValue(timeVal string, params map[string][]string, expectAllDay bool) (time.Time, error) {
 	matched := timeStampVariations.FindStringSubmatch(timeVal)
 	if matched == nil {
 		return time.Time{}, fmt.Errorf("time value not matched, got '%s'", timeVal)
@@ -290,7 +294,7 @@ func (cb *ComponentBase) getTimeProp(componentProperty ComponentProperty, expect
 	grp1len := len(matched[1])
 	grp3len := len(matched[3])
 
-	tzId, tzIdOk := timeProp.ICalParameters["TZID"]
+	tzId, tzIdOk := params["TZID"]
 	var propLoc *time.Location
 	if tzIdOk {
 		if len(tzId) != 1 {
@@ -358,6 +362,82 @@ func (cb *ComponentBase) GetDtStampTime() (time.Time, error) {
 	return cb.getTimeProp(ComponentPropertyDtstamp, false)
 }
 
+// GetRRules returns all RRULE properties parsed into RecurrenceRule structs.
+func (cb *ComponentBase) GetRRules() ([]*RecurrenceRule, error) {
+	return cb.getRecurrenceRules(ComponentPropertyRrule)
+}
+
+// GetExRules returns all EXRULE properties parsed into RecurrenceRule structs.
+func (cb *ComponentBase) GetExRules() ([]*RecurrenceRule, error) {
+	return cb.getRecurrenceRules(ComponentPropertyExrule)
+}
+
+func (cb *ComponentBase) getRecurrenceRules(prop ComponentProperty) ([]*RecurrenceRule, error) {
+	props := cb.GetProperties(prop)
+	if len(props) == 0 {
+		return nil, nil
+	}
+	rules := make([]*RecurrenceRule, 0, len(props))
+	for _, p := range props {
+		r, err := ParseRecurrenceRule(p.Value)
+		if err != nil {
+			return nil, fmt.Errorf("parsing %s: %w", prop, err)
+		}
+		rules = append(rules, r)
+	}
+	return rules, nil
+}
+
+// GetRDates returns all RDATE times, handling both comma-separated values
+// within a single property and multiple RDATE properties.
+func (cb *ComponentBase) GetRDates() ([]time.Time, error) {
+	return cb.getMultiTimeProp(ComponentPropertyRdate)
+}
+
+// GetExDates returns all EXDATE times, handling both comma-separated values
+// within a single property and multiple EXDATE properties.
+func (cb *ComponentBase) GetExDates() ([]time.Time, error) {
+	return cb.getMultiTimeProp(ComponentPropertyExdate)
+}
+
+// GetRecurrenceID returns the RECURRENCE-ID property as a time.Time.
+func (cb *ComponentBase) GetRecurrenceID() (time.Time, error) {
+	return cb.getTimeProp(ComponentPropertyRecurrenceId, false)
+}
+
+func (cb *ComponentBase) getMultiTimeProp(prop ComponentProperty) ([]time.Time, error) {
+	props := cb.GetProperties(prop)
+	if len(props) == 0 {
+		return nil, nil
+	}
+	var times []time.Time
+	for _, p := range props {
+		values := strings.Split(p.Value, ",")
+		// Check if VALUE=DATE is explicitly set in parameters
+		isDateOnly := false
+		if vals, ok := p.ICalParameters["VALUE"]; ok {
+			for _, val := range vals {
+				if val == "DATE" {
+					isDateOnly = true
+					break
+				}
+			}
+		}
+		for _, v := range values {
+			v = strings.TrimSpace(v)
+			if v == "" {
+				continue
+			}
+			t, err := parseTimeValue(v, p.ICalParameters, isDateOnly)
+			if err != nil {
+				return nil, fmt.Errorf("parsing %s value %q: %w", prop, v, err)
+			}
+			times = append(times, t)
+		}
+	}
+	return times, nil
+}
+
 func (cb *ComponentBase) SetSummary(s string, params ...PropertyParameter) {
 	cb.SetProperty(ComponentPropertySummary, s, params...)
 }
@@ -376,6 +456,18 @@ func (cb *ComponentBase) SetLocation(s string, params ...PropertyParameter) {
 
 func (cb *ComponentBase) setGeo(lat interface{}, lng interface{}, params ...PropertyParameter) {
 	cb.SetProperty(ComponentPropertyGeo, fmt.Sprintf("%v;%v", lat, lng), params...)
+}
+
+type GeoType interface {
+	~float32 | ~float64 | ~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~string
+}
+
+type SetPropertyOwner interface {
+	SetProperty(property ComponentProperty, value string, params ...PropertyParameter)
+}
+
+func SetGeo[T GeoType](c SetPropertyOwner, lat T, lng T, params ...PropertyParameter) {
+	c.SetProperty(ComponentPropertyGeo, fmt.Sprintf("%v;%v", lat, lng), params...)
 }
 
 func (cb *ComponentBase) SetURL(s string, params ...PropertyParameter) {
@@ -541,7 +633,7 @@ func (event *VEvent) Serialize(serialConfig *SerializationConfiguration) string 
 }
 
 func (event *VEvent) serialize(serialConfig *SerializationConfiguration) (string, error) {
-	b := &bytes.Buffer{}
+	b := &strings.Builder{}
 	err := event.ComponentBase.serializeThis(b, ComponentVEvent, serialConfig)
 	return b.String(), err
 }
@@ -561,7 +653,7 @@ func (event *VEvent) SetLastModifiedAt(t time.Time, props ...PropertyParameter) 
 	event.SetProperty(ComponentPropertyLastModified, t.UTC().Format(icalTimestampFormatUtc), props...)
 }
 
-// TODO use generics
+// SetGeo sets the geo property
 func (event *VEvent) SetGeo(lat interface{}, lng interface{}, params ...PropertyParameter) {
 	event.setGeo(lat, lng, params...)
 }
@@ -615,7 +707,7 @@ func (todo *VTodo) Serialize(serialConfig *SerializationConfiguration) string {
 }
 
 func (todo *VTodo) serialize(serialConfig *SerializationConfiguration) (string, error) {
-	b := &bytes.Buffer{}
+	b := &strings.Builder{}
 	err := todo.ComponentBase.serializeThis(b, ComponentVTodo, serialConfig)
 	if err != nil {
 		return "", err
@@ -673,6 +765,7 @@ func (todo *VTodo) SetPercentComplete(p int, params ...PropertyParameter) {
 	todo.SetProperty(ComponentPropertyPercentComplete, strconv.Itoa(p), params...)
 }
 
+// SetGeo sets the geo property
 func (todo *VTodo) SetGeo(lat interface{}, lng interface{}, params ...PropertyParameter) {
 	todo.setGeo(lat, lng, params...)
 }
@@ -739,7 +832,7 @@ func (journal *VJournal) Serialize(serialConfig *SerializationConfiguration) str
 }
 
 func (journal *VJournal) serialize(serialConfig *SerializationConfiguration) (string, error) {
-	b := &bytes.Buffer{}
+	b := &strings.Builder{}
 	err := journal.ComponentBase.serializeThis(b, ComponentVJournal, serialConfig)
 	if err != nil {
 		return "", err
@@ -785,7 +878,7 @@ func (busy *VBusy) Serialize(serialConfig *SerializationConfiguration) string {
 }
 
 func (busy *VBusy) serialize(serialConfig *SerializationConfiguration) (string, error) {
-	b := &bytes.Buffer{}
+	b := &strings.Builder{}
 	err := busy.ComponentBase.serializeThis(b, ComponentVFreeBusy, serialConfig)
 	if err != nil {
 		return "", err
@@ -835,7 +928,7 @@ func (timezone *VTimezone) Serialize(serialConfig *SerializationConfiguration) s
 }
 
 func (timezone *VTimezone) serialize(serialConfig *SerializationConfiguration) (string, error) {
-	b := &bytes.Buffer{}
+	b := &strings.Builder{}
 	err := timezone.ComponentBase.serializeThis(b, ComponentVTimezone, serialConfig)
 	if err != nil {
 		return "", err
@@ -895,7 +988,7 @@ func (c *VAlarm) Serialize(serialConfig *SerializationConfiguration) string {
 }
 
 func (c *VAlarm) serialize(serialConfig *SerializationConfiguration) (string, error) {
-	b := &bytes.Buffer{}
+	b := &strings.Builder{}
 	err := c.ComponentBase.serializeThis(b, ComponentVAlarm, serialConfig)
 	if err != nil {
 		return "", err
@@ -953,7 +1046,7 @@ func (standard *Standard) Serialize(serialConfig *SerializationConfiguration) st
 }
 
 func (standard *Standard) serialize(serialConfig *SerializationConfiguration) (string, error) {
-	b := &bytes.Buffer{}
+	b := &strings.Builder{}
 	err := standard.ComponentBase.serializeThis(b, ComponentStandard, serialConfig)
 	if err != nil {
 		return "", err
@@ -975,7 +1068,7 @@ func (daylight *Daylight) Serialize(serialConfig *SerializationConfiguration) st
 }
 
 func (daylight *Daylight) serialize(serialConfig *SerializationConfiguration) (string, error) {
-	b := &bytes.Buffer{}
+	b := &strings.Builder{}
 	err := daylight.ComponentBase.serializeThis(b, ComponentDaylight, serialConfig)
 	if err != nil {
 		return "", err
@@ -998,7 +1091,7 @@ func (general *GeneralComponent) Serialize(serialConfig *SerializationConfigurat
 }
 
 func (general *GeneralComponent) serialize(serialConfig *SerializationConfiguration) (string, error) {
-	b := &bytes.Buffer{}
+	b := &strings.Builder{}
 	err := general.ComponentBase.serializeThis(b, ComponentType(general.Token), serialConfig)
 	if err != nil {
 		return "", err
@@ -1222,7 +1315,22 @@ func ParseComponent(cs *CalendarStream, startLine *BaseProperty) (ComponentBase,
 			if co != nil {
 				cb.Components = append(cb.Components, co)
 			}
-		default: // TODO put in all the supported types for type switching etc.
+		case string(ComponentPropertyUniqueId), string(ComponentPropertyDtstamp), string(ComponentPropertyOrganizer),
+			string(ComponentPropertyAttendee), string(ComponentPropertyAttach), string(ComponentPropertyDescription),
+			string(ComponentPropertyCategories), string(ComponentPropertyClass), string(ComponentPropertyColor),
+			string(ComponentPropertyCreated), string(ComponentPropertySummary), string(ComponentPropertyDtStart),
+			string(ComponentPropertyDtEnd), string(ComponentPropertyLocation), string(ComponentPropertyStatus),
+			string(ComponentPropertyFreebusy), string(ComponentPropertyLastModified), string(ComponentPropertyUrl),
+			string(ComponentPropertyGeo), string(ComponentPropertyTransp), string(ComponentPropertySequence),
+			string(ComponentPropertyExdate), string(ComponentPropertyExrule), string(ComponentPropertyRdate),
+			string(ComponentPropertyRrule), string(ComponentPropertyAction), string(ComponentPropertyTrigger),
+			string(ComponentPropertyPriority), string(ComponentPropertyResources), string(ComponentPropertyCompleted),
+			string(ComponentPropertyDue), string(ComponentPropertyPercentComplete), string(ComponentPropertyTzid),
+			string(ComponentPropertyComment), string(ComponentPropertyRelatedTo), string(ComponentPropertyMethod),
+			string(ComponentPropertyRecurrenceId), string(ComponentPropertyDuration), string(ComponentPropertyContact),
+			string(ComponentPropertyRequestStatus):
+			cb.Properties = append(cb.Properties, IANAProperty{*line})
+		default:
 			cb.Properties = append(cb.Properties, IANAProperty{*line})
 		}
 	}

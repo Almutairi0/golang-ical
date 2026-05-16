@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"embed"
 	_ "embed"
-	"github.com/google/go-cmp/cmp"
 	"io"
 	"io/fs"
 	"net/http"
@@ -15,7 +14,9 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -283,9 +284,10 @@ END:VCALENDAR
 
 func TestParseCalendar(t *testing.T) {
 	testCases := []struct {
-		name   string
-		input  string
-		output string
+		name         string
+		input        string
+		output       string
+		parseOptions []any
 	}{
 		{
 			name: "test custom fields in calendar",
@@ -380,11 +382,57 @@ END:VEVENT
 END:VCALENDAR
 `,
 		},
+		{
+			name: "test properties after components",
+			input: `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VTIMEZONE
+TZID:Europe/London
+BEGIN:STANDARD
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0000
+DTSTART:19701025T020000
+END:STANDARD
+END:VTIMEZONE
+TIMEZONE-ID:VT
+X-WR-TIMEZONE:VT
+BEGIN:VEVENT
+DTSTART:20230101T120000Z
+SUMMARY:Test Event
+END:VEVENT
+END:VCALENDAR
+`,
+			parseOptions: []any{WithUnknownPropertyHandler(AcceptUnknownPropertyHandler)},
+			output: `BEGIN:VCALENDAR
+VERSION:2.0
+TIMEZONE-ID:VT
+X-WR-TIMEZONE:VT
+BEGIN:VTIMEZONE
+TZID:Europe/London
+BEGIN:STANDARD
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0000
+DTSTART:19701025T020000
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+DTSTART:20230101T120000Z
+SUMMARY:Test Event
+END:VEVENT
+END:VCALENDAR
+`,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			c, err := ParseCalendar(strings.NewReader(tc.input))
+			var c *Calendar
+			var err error
+			if len(tc.parseOptions) > 0 {
+				c, err = ParseCalendarWithOptions(strings.NewReader(tc.input), tc.parseOptions...)
+			} else {
+				c, err = ParseCalendar(strings.NewReader(tc.input))
+			}
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -491,5 +539,18 @@ func TestIssue77(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("Error reading file: %s", err)
+	}
+}
+
+func BenchmarkSerialize(b *testing.B) {
+	calFile, err := TestData.Open("testdata/serialization/input2.ics")
+	require.NoError(b, err)
+
+	cal, err := ParseCalendar(calFile)
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cal.Serialize()
 	}
 }
