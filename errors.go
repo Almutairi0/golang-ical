@@ -44,7 +44,13 @@ var (
 	ErrUnexpectedASCIIChar                       = errors.New("unexpected char ascii")
 	ErrUnexpectedDoubleQuoteInPropertyParamValue = errors.New("unexpected double quote in property param value")
 
-	ErrUnbalancedEnd = errors.New("unbalanced end")
-	ErrOutOfLines    = errors.New("ran out of lines")
+	ErrUnbalancedEnd      = errors.New("unbalanced end")
+	ErrOutOfLines         = errors.New("ran out of lines")
 	ErrorPropertyNotFound = errors.New("property not found")
+
+	// ErrInvalidOpArg marks an invalid variadic option argument.
+	ErrInvalidOpArg = errors.New("invalid option argument")
+
+	// ErrPropertySkipped marks a parser decision to skip a malformed line and continue.
+	ErrPropertySkipped = errors.New("property skipped")
 )
