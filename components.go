@@ -1120,7 +1120,7 @@ func generalParseComponentWithHandler(cs *CalendarStream, startLine *BasePropert
 	}
 	switch ComponentType(startLine.Value) {
 	case ComponentVCalendar:
-		return nil, ErrMalformedCalendarVCalendarNotWhereExpected
+		return nil, ErrVCalendarNotWhereExpected
 	case ComponentVEvent:
 		r, rerr := parseComponentWithHandler(cs, startLine, parser)
 		if rerr != nil {
@@ -1338,9 +1338,10 @@ func parseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts
 	if err != nil {
 		return cb, err
 	}
+	lastLine := 0
 	cont := true
-	for ln := 0; cont; ln++ {
-		l, err := cs.ReadLine()
+	for cont {
+		l, lineNo, err := cs.ReadLine()
 		if err != nil {
 			switch {
 			case errors.Is(err, io.EOF):
@@ -1357,18 +1358,19 @@ func parseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts
 			if errors.Is(err, ErrPropertySkipped) {
 				continue
 			}
-			return cb, fmt.Errorf("parsing component property %d: %w", ln, err)
+			return cb, NewMalformedError(lineNo, -1, err)
 		}
 		if line == nil {
 			continue
 		}
+		lastLine = lineNo
 		switch line.IANAToken {
 		case "END":
 			switch line.Value {
 			case startLine.Value:
 				return cb, nil
 			default:
-				return cb, ErrUnbalancedEnd
+				return cb, NewMalformedError(lineNo, -1, ErrUnbalancedEnd)
 			}
 		case "BEGIN":
 			co, err := generalParseComponentWithHandler(cs, line, parser)
@@ -1397,5 +1399,5 @@ func parseComponentWithHandler(cs *CalendarStream, startLine *BaseProperty, opts
 			cb.Properties = append(cb.Properties, IANAProperty{*line})
 		}
 	}
-	return cb, ErrOutOfLines
+	return cb, NewMalformedError(lastLine, -1, ErrOutOfLines)
 }

@@ -155,7 +155,7 @@ CLASS:PUBLIC
 	c := NewCalendarStream(strings.NewReader(i))
 	cont := true
 	for i := 0; cont; i++ {
-		l, err := c.ReadLine()
+		l, _, err := c.ReadLine()
 		if err != nil {
 			switch {
 			case errors.Is(err, io.EOF):
@@ -718,6 +718,77 @@ END:VCALENDAR
 `
 	_, err := ParseCalendar(strings.NewReader(input))
 	assert.Error(t, err)
+}
+
+func TestParseCalendar_MalformedErrorIncludesLine(t *testing.T) {
+	input := `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+BEGIN:VEVENT
+DTSTART:20240101T120000Z
+SUMMARY:Test Event
+X-BAD;under_score=val:value
+END:VEVENT
+END:VCALENDAR
+`
+
+	_, err := ParseCalendar(strings.NewReader(input))
+	if !assert.Error(t, err) {
+		return
+	}
+	var malformed *MalformedError
+	if assert.True(t, errors.As(err, &malformed)) {
+		assert.Equal(t, 7, malformed.Line)
+		assert.False(t, malformed.HasChar)
+		assert.ErrorIs(t, err, ErrMissingPropertyValue)
+	}
+}
+
+func TestParseCalendar_MalformedErrorFirstLine(t *testing.T) {
+	input := `BOGUS:VCALENDAR
+VERSION:2.0
+END:VCALENDAR
+`
+
+	_, err := ParseCalendar(strings.NewReader(input))
+	if !assert.Error(t, err) {
+		return
+	}
+	var malformed *MalformedError
+	if assert.True(t, errors.As(err, &malformed)) {
+		assert.Equal(t, 1, malformed.Line)
+		assert.False(t, malformed.HasChar)
+		assert.ErrorIs(t, err, ErrExpectedBegin)
+	}
+}
+
+func TestParseCalendar_MalformedErrorNestedComponentLine(t *testing.T) {
+	input := `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+BEGIN:VEVENT
+DTSTART:20240101T120000Z
+SUMMARY:Test Event
+BEGIN:VALARM
+TRIGGER:-PT15M
+ACTION:DISPLAY
+X-ALARM-BAD;under_score=val:alarm-value
+DESCRIPTION:Reminder
+END:VALARM
+END:VEVENT
+END:VCALENDAR
+`
+
+	_, err := ParseCalendar(strings.NewReader(input))
+	if !assert.Error(t, err) {
+		return
+	}
+	var malformed *MalformedError
+	if assert.True(t, errors.As(err, &malformed)) {
+		assert.Equal(t, 10, malformed.Line)
+		assert.False(t, malformed.HasChar)
+		assert.ErrorIs(t, err, ErrMissingPropertyValue)
+	}
 }
 
 func TestWithPropertyParser_NestedComponent(t *testing.T) {
