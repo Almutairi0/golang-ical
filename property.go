@@ -164,7 +164,7 @@ func (bp *BaseProperty) GetValueType() ValueDataType {
 	}
 }
 
-func (bp *BaseProperty) serialize(w io.Writer, serialConfig *SerializationConfiguration) error {
+func (bp *BaseProperty) SerializeTo(w io.Writer, serialConfig *SerializationConfiguration) error {
 	var b strings.Builder
 	b.WriteString(bp.IANAToken)
 
@@ -283,20 +283,104 @@ func init() {
 
 type ContentLine string
 
+// PropertyParser is an optional replacement parser for malformed content lines.
+// It receives the raw content line and can either recover, skip, or abort.
+type PropertyParser func(rawLine ContentLine) (*BaseProperty, error)
+
+// ParseProperty parses a single RFC5545 content line using strict parsing rules.
 func ParseProperty(contentLine ContentLine) (*BaseProperty, error) {
+	return parseProperty(contentLine)
+}
+
+// SkipPropertyParser is an alternative to the default strict parser path used by ParseCalendar and ParseComponent.
+// It returns parsed properties when the line is valid and skips malformed lines.
+func SkipPropertyParser(rawLine ContentLine) (*BaseProperty, error) {
+	line, err := parseProperty(rawLine)
+	if err != nil {
+		return nil, nil
+	}
+	return line, nil
+}
+
+// LooseParser is an alternative to the default strict parser path used by ParseCalendar and ParseComponent.
+// It preserves the property token and value when malformed parameters prevent a full parse.
+func LooseParser(rawLine ContentLine) (*BaseProperty, error) {
+	s := string(rawLine)
+	colonIdx := strings.Index(s, ":")
+	if colonIdx <= 0 {
+		return nil, fmt.Errorf("%w: unable to recover property (no colon)", ErrPropertySkipped)
+	}
+	tokenEnd := colonIdx
+	if semiIdx := strings.Index(s, ";"); semiIdx > 0 && semiIdx < colonIdx {
+		tokenEnd = semiIdx
+	}
+	return &BaseProperty{
+		IANAToken:      s[:tokenEnd],
+		Value:          s[colonIdx+1:],
+		ICalParameters: map[string][]string{},
+	}, nil
+}
+
+// FallbackParser builds an alternative to the default strict parser path used by ParseCalendar and ParseComponent.
+// It tries the strict parser first, then each supplied fallback parser in order.
+func FallbackParser(fallback PropertyParser, fallbacks ...PropertyParser) PropertyParser {
+	parsers := append([]PropertyParser{fallback}, fallbacks...)
+	return func(rawLine ContentLine) (*BaseProperty, error) {
+		line, err := parseProperty(rawLine)
+		if err == nil {
+			return line, nil
+		}
+		for _, p := range parsers {
+			if p == nil {
+				continue
+			}
+			line, err := p(rawLine)
+			if err != nil {
+				if errors.Is(err, ErrPropertySkipped) {
+					continue
+				}
+				return nil, err
+			}
+			if line != nil {
+				return line, nil
+			}
+		}
+		return nil, fmt.Errorf("%w: no capable parsers found", ErrPropertySkipped)
+	}
+}
+
+func parsePropertyParserOptions(current PropertyParser, opts ...any) (PropertyParser, error) {
+	for i, opt := range opts {
+		switch opt := opt.(type) {
+		case PropertyParser:
+			if opt != nil {
+				current = opt
+			}
+		case func(ContentLine) (*BaseProperty, error):
+			if opt != nil {
+				current = PropertyParser(opt)
+			}
+		default:
+			return current, fmt.Errorf("%w %d: %T", ErrInvalidOpArg, i, opt)
+		}
+	}
+	return current, nil
+}
+
+func parseProperty(contentLine ContentLine) (*BaseProperty, error) {
 	r := &BaseProperty{
 		ICalParameters: map[string][]string{},
 	}
 	tokenPos := propertyIanaTokenReg.FindIndex([]byte(contentLine))
 	if tokenPos == nil {
-		return nil, nil
+		return nil, fmt.Errorf("invalid property token in %q", contentLine)
 	}
 	p := 0
 	r.IANAToken = string(contentLine[p+tokenPos[0] : p+tokenPos[1]])
 	p += tokenPos[1]
 	for {
 		if p >= len(contentLine) {
-			return nil, nil
+			return nil, fmt.Errorf("unexpected end of property %s", r.IANAToken)
 		}
 		switch rune(contentLine[p]) {
 		case ':':
@@ -307,14 +391,14 @@ func ParseProperty(contentLine ContentLine) (*BaseProperty, error) {
 			t := r.IANAToken
 			r, np, err = parsePropertyParam(r, string(contentLine), p+1)
 			if err != nil {
-				return nil, fmt.Errorf("parsing property %s: %w", t, err)
+				return nil, fmt.Errorf("%w %s: %w", ErrParsingProperty, t, err)
 			}
 			if r == nil {
-				return nil, nil
+				return nil, fmt.Errorf("parsing property %s: invalid property", t)
 			}
 			p = np
 		default:
-			return nil, nil
+			return nil, fmt.Errorf("parsing property %s: unexpected character %q", r.IANAToken, contentLine[p])
 		}
 	}
 }
@@ -328,13 +412,13 @@ func parsePropertyParam(r *BaseProperty, contentLine string, p int) (*BaseProper
 	k = string(contentLine[p : p+tokenPos[1]])
 	p += tokenPos[1]
 	if p >= len(contentLine) {
-		return nil, p, fmt.Errorf("missing property param operator for %s in %s", k, r.IANAToken)
+		return nil, p, fmt.Errorf("%w for %s in %s", ErrMissingPropertyParamOperator, k, r.IANAToken)
 	}
 	switch rune(contentLine[p]) {
 	case '=':
 		p += 1
 	default:
-		return nil, p, fmt.Errorf("missing property value for %s in %s", k, r.IANAToken)
+		return nil, p, fmt.Errorf("%w for %s in %s", ErrMissingPropertyValue, k, r.IANAToken)
 	}
 	for {
 		if p >= len(contentLine) {
@@ -343,11 +427,11 @@ func parsePropertyParam(r *BaseProperty, contentLine string, p int) (*BaseProper
 		var err error
 		v, p, err = parsePropertyParamValue(contentLine, p)
 		if err != nil {
-			return nil, 0, fmt.Errorf("parse error: %w %s in %s", err, k, r.IANAToken)
+			return nil, 0, fmt.Errorf("%w: %w %s in %s", ErrParse, err, k, r.IANAToken)
 		}
 		r.ICalParameters[k] = append(r.ICalParameters[k], v)
 		if p >= len(contentLine) {
-			return nil, p, fmt.Errorf("unexpected end of property %s", r.IANAToken)
+			return nil, p, fmt.Errorf("%w %s", ErrUnexpectedEndOfProperty, r.IANAToken)
 		}
 		switch rune(contentLine[p]) {
 		case ',':
@@ -392,13 +476,13 @@ func parsePropertyParamValue(s string, p int) (string, int, error) {
 	for ; p < len(s) && !done; p++ {
 		switch s[p] {
 		case 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08:
-			return "", 0, fmt.Errorf("unexpected char ascii:%d in property param value", s[p])
+			return "", 0, fmt.Errorf("%w:%d in property param value", ErrUnexpectedASCIIChar, s[p])
 		case 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B,
 			0x1C, 0x1D, 0x1E, 0x1F:
-			return "", 0, fmt.Errorf("unexpected char ascii:%d in property param value", s[p])
+			return "", 0, fmt.Errorf("%w:%d in property param value", ErrUnexpectedASCIIChar, s[p])
 		case '\\':
 			if p+2 >= len(s) {
-				return "", 0, errors.New("unexpected end of param value")
+				return "", 0, ErrUnexpectedParamValueLength
 			}
 			r = append(r, []byte(FromText(string(s[p+1:p+2])))...)
 			p++
@@ -418,7 +502,7 @@ func parsePropertyParamValue(s string, p int) (string, int, error) {
 				done = true
 				continue
 			}
-			return "", 0, fmt.Errorf("unexpected double quote in property param value")
+			return "", 0, ErrUnexpectedDoubleQuoteInPropertyParamValue
 		}
 		r = append(r, s[p])
 	}
