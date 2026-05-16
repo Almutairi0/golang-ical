@@ -380,6 +380,21 @@ const (
 	ClassificationConfidential Classification = "CONFIDENTIAL"
 )
 
+// Method represents the iCalendar METHOD property.
+//
+// These should be used with caution when creating simple iCal (.ics) files.
+// The iCalendar specification is defined in RFC 5545. It refers to RFC 5546,
+// which defines the ADD method as allowing the Organizer to add one or more
+// new instances to an existing VEVENT using a single iTIP message. The UID
+// must be that of the existing event.
+//
+// If you include METHOD: ADD in your .ics file (or use SetMethod(MethodAdd)),
+// it is required to refer to existing calendar events. If you are simply
+// writing .ics files to import into calendaring tools, it is not likely that
+// you will want to use this option. Notably, the Apple Calendar program will
+// reject events in .ics files that have this set if they do not refer to
+// existing calendar events; some other calendars (like Microsoft Outlook)
+// have a more permissive import process and will accept them.
 type Method string
 
 const (
@@ -486,6 +501,21 @@ func defaultSerializationOptions() *SerializationConfiguration {
 	return serializeConfig
 }
 
+// SetMethod sets the METHOD property for the calendar.
+//
+// These should be used with caution when creating simple iCal (.ics) files.
+// The iCalendar specification is defined in RFC 5545. It refers to RFC 5546,
+// which defines the ADD method as allowing the Organizer to add one or more
+// new instances to an existing VEVENT using a single iTIP message. The UID
+// must be that of the existing event.
+//
+// If you include METHOD: ADD in your .ics file (or use SetMethod(MethodAdd)),
+// it is required to refer to existing calendar events. If you are simply
+// writing .ics files to import into calendaring tools, it is not likely that
+// you will want to use this option. Notably, the Apple Calendar program will
+// reject events in .ics files that have this set if they do not refer to
+// existing calendar events; some other calendars (like Microsoft Outlook)
+// have a more permissive import process and will accept them.
 func (cal *Calendar) SetMethod(method Method, params ...PropertyParameter) {
 	cal.setProperty(PropertyMethod, string(method), params...)
 }
