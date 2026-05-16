@@ -135,7 +135,7 @@ func (bp *BaseProperty) GetValueType() ValueDataType {
 		PropertyRequestStatus:
 		return ValueDataTypeText
 
-	case PropertyAttach, PropertyTzurl, PropertyUrl:
+	case PropertyAttach, PropertyTzurl, PropertyUrl, PropertySource:
 		return ValueDataTypeUri
 
 	case PropertyGeo:
