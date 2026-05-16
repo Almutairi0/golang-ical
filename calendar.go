@@ -385,11 +385,11 @@ const (
 // These should be used with caution when creating simple iCal (.ics) files.
 // The iCalendar specification is defined in RFC 5545. It refers to RFC 5546,
 // which defines the ADD method as allowing the Organizer to add one or more
-// new instances to an existing VEVENT using a single iTIP message. The UID
-// must be that of the existing event.
+// new instances to an existing VEVENT, VTODO, or VJOURNAL using a single iTIP message. The UID
+// must be that of the existing event/task/journal.
 //
 // If you include METHOD: ADD in your .ics file (or use SetMethod(MethodAdd)),
-// it is required to refer to existing calendar events. If you are simply
+// it is required to refer to existing calendar components. If you are simply
 // writing .ics files to import into calendaring tools, it is not likely that
 // you will want to use this option. Notably, the Apple Calendar program will
 // reject events in .ics files that have this set if they do not refer to
@@ -506,11 +506,11 @@ func defaultSerializationOptions() *SerializationConfiguration {
 // These should be used with caution when creating simple iCal (.ics) files.
 // The iCalendar specification is defined in RFC 5545. It refers to RFC 5546,
 // which defines the ADD method as allowing the Organizer to add one or more
-// new instances to an existing VEVENT using a single iTIP message. The UID
-// must be that of the existing event.
+// new instances to an existing VEVENT, VTODO, or VJOURNAL using a single iTIP message. The UID
+// must be that of the existing event/task/journal.
 //
 // If you include METHOD: ADD in your .ics file (or use SetMethod(MethodAdd)),
-// it is required to refer to existing calendar events. If you are simply
+// it is required to refer to existing calendar components. If you are simply
 // writing .ics files to import into calendaring tools, it is not likely that
 // you will want to use this option. Notably, the Apple Calendar program will
 // reject events in .ics files that have this set if they do not refer to
