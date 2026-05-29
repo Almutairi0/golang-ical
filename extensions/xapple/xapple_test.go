@@ -1,7 +1,7 @@
 //go:build !noapple
 // +build !noapple
 
-package apple
+package xapple
 
 import (
 	"strings"

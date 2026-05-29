@@ -4,17 +4,17 @@ import (
 	ical "github.com/arran4/golang-ical"
 )
 
-// PropertyXWrTimezone is the X-WR-TIMEZONE property
-const PropertyXWrTimezone = "X-WR-TIMEZONE"
+// PropertyTimezone is the X-WR-TIMEZONE property
+const PropertyTimezone = "X-WR-TIMEZONE"
 
-// PropertyXWrCalName is the X-WR-CALNAME property
-const PropertyXWrCalName = "X-WR-CALNAME"
+// PropertyCalName is the X-WR-CALNAME property
+const PropertyCalName = "X-WR-CALNAME"
 
-// PropertyXWrCalDesc is the X-WR-CALDESC property
-const PropertyXWrCalDesc = "X-WR-CALDESC"
+// PropertyCalDesc is the X-WR-CALDESC property
+const PropertyCalDesc = "X-WR-CALDESC"
 
-// PropertyXWrRelCalId is the X-WR-RELCALID property
-const PropertyXWrRelCalId = "X-WR-RELCALID"
+// PropertyRelCalId is the X-WR-RELCALID property
+const PropertyRelCalId = "X-WR-RELCALID"
 
 // SetProperty allows extending the properties easily
 func SetProperty(cal *ical.Calendar, property string, value string, params ...ical.PropertyParameter) {
