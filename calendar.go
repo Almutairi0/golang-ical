@@ -653,6 +653,10 @@ func (cal *Calendar) addComponent(c Component) {
 	cal.Components = append(cal.Components, c)
 }
 
+func (cal *Calendar) SetProperty(property Property, value string, params ...PropertyParameter) {
+	cal.setProperty(property, value, params...)
+}
+
 func (cal *Calendar) setProperty(property Property, value string, params ...PropertyParameter) {
 	for i := range cal.CalendarProperties {
 		if cal.CalendarProperties[i].IANAToken == string(property) {
