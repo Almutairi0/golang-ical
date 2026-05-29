@@ -7,6 +7,18 @@ import (
 	ical "github.com/arran4/golang-ical"
 )
 
+// PropertyXAppleCalendarColor is the X-APPLE-CALENDAR-COLOR property
+const PropertyXAppleCalendarColor = "X-APPLE-CALENDAR-COLOR"
+
+// PropertyXAppleRegion is the X-APPLE-REGION property
+const PropertyXAppleRegion = "X-APPLE-REGION"
+
+// ComponentPropertyXAppleStructuredLocation is the X-APPLE-STRUCTURED-LOCATION component property
+const ComponentPropertyXAppleStructuredLocation = "X-APPLE-STRUCTURED-LOCATION"
+
+// ComponentPropertyXAppleTravelDuration is the X-APPLE-TRAVEL-DURATION component property
+const ComponentPropertyXAppleTravelDuration = "X-APPLE-TRAVEL-DURATION"
+
 type propertySetter interface {
 	SetProperty(property ical.ComponentProperty, value string, props ...ical.PropertyParameter)
 }
@@ -26,22 +38,22 @@ func SetComponentProperty(c ical.Component, property string, value string, param
 
 // SetCalendarColor sets the X-APPLE-CALENDAR-COLOR property for the calendar
 func SetCalendarColor(cal *ical.Calendar, color string, params ...ical.PropertyParameter) {
-	SetProperty(cal, "X-APPLE-CALENDAR-COLOR", color, params...)
+	SetProperty(cal, PropertyXAppleCalendarColor, color, params...)
 }
 
 // SetRegion sets the X-APPLE-REGION property for the calendar
 func SetRegion(cal *ical.Calendar, region string, params ...ical.PropertyParameter) {
-	SetProperty(cal, "X-APPLE-REGION", region, params...)
+	SetProperty(cal, PropertyXAppleRegion, region, params...)
 }
 
 // Component properties
 
 // SetStructuredLocation sets the X-APPLE-STRUCTURED-LOCATION property for a component
 func SetStructuredLocation(c ical.Component, location string, params ...ical.PropertyParameter) {
-	SetComponentProperty(c, "X-APPLE-STRUCTURED-LOCATION", location, params...)
+	SetComponentProperty(c, ComponentPropertyXAppleStructuredLocation, location, params...)
 }
 
 // SetTravelDuration sets the X-APPLE-TRAVEL-DURATION property for a component
 func SetTravelDuration(c ical.Component, duration string, params ...ical.PropertyParameter) {
-	SetComponentProperty(c, "X-APPLE-TRAVEL-DURATION", duration, params...)
+	SetComponentProperty(c, ComponentPropertyXAppleTravelDuration, duration, params...)
 }
