@@ -4,17 +4,21 @@ import (
 	ical "github.com/arran4/golang-ical"
 )
 
-// PropertyCalendarColor is the X-APPLE-CALENDAR-COLOR property
-const PropertyCalendarColor = "X-APPLE-CALENDAR-COLOR"
+const (
+	// PropertyCalendarColor is the X-APPLE-CALENDAR-COLOR property
+	PropertyCalendarColor ical.Property = "X-APPLE-CALENDAR-COLOR"
 
-// PropertyRegion is the X-APPLE-REGION property
-const PropertyRegion = "X-APPLE-REGION"
+	// PropertyRegion is the X-APPLE-REGION property
+	PropertyRegion ical.Property = "X-APPLE-REGION"
+)
 
-// ComponentPropertyStructuredLocation is the X-APPLE-STRUCTURED-LOCATION component property
-const ComponentPropertyStructuredLocation = "X-APPLE-STRUCTURED-LOCATION"
+const (
+	// ComponentPropertyStructuredLocation is the X-APPLE-STRUCTURED-LOCATION component property
+	ComponentPropertyStructuredLocation ical.ComponentProperty = "X-APPLE-STRUCTURED-LOCATION"
 
-// ComponentPropertyTravelDuration is the X-APPLE-TRAVEL-DURATION component property
-const ComponentPropertyTravelDuration = "X-APPLE-TRAVEL-DURATION"
+	// ComponentPropertyTravelDuration is the X-APPLE-TRAVEL-DURATION component property
+	ComponentPropertyTravelDuration ical.ComponentProperty = "X-APPLE-TRAVEL-DURATION"
+)
 
 type propertySetter interface {
 	SetProperty(property ical.ComponentProperty, value string, props ...ical.PropertyParameter)
@@ -68,22 +72,22 @@ func SetComponentProperty(c ical.Component, property string, value string, param
 
 // SetCalendarColor sets the X-APPLE-CALENDAR-COLOR property for the calendar
 func SetCalendarColor(cal *ical.Calendar, color string, params ...ical.PropertyParameter) {
-	SetProperty(cal, PropertyCalendarColor, color, params...)
+	SetProperty(cal, string(PropertyCalendarColor), color, params...)
 }
 
 // SetRegion sets the X-APPLE-REGION property for the calendar
 func SetRegion(cal *ical.Calendar, region string, params ...ical.PropertyParameter) {
-	SetProperty(cal, PropertyRegion, region, params...)
+	SetProperty(cal, string(PropertyRegion), region, params...)
 }
 
 // Component properties
 
 // SetStructuredLocation sets the X-APPLE-STRUCTURED-LOCATION property for a component
 func SetStructuredLocation(c ical.Component, location string, params ...ical.PropertyParameter) {
-	SetComponentProperty(c, ComponentPropertyStructuredLocation, location, params...)
+	SetComponentProperty(c, string(ComponentPropertyStructuredLocation), location, params...)
 }
 
 // SetTravelDuration sets the X-APPLE-TRAVEL-DURATION property for a component
 func SetTravelDuration(c ical.Component, duration string, params ...ical.PropertyParameter) {
-	SetComponentProperty(c, ComponentPropertyTravelDuration, duration, params...)
+	SetComponentProperty(c, string(ComponentPropertyTravelDuration), duration, params...)
 }
