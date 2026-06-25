@@ -7,28 +7,28 @@ import (
 
 func TestCalendarProperties(t *testing.T) {
 	cal := ical.NewCalendar()
-	SetCalname(cal, "Test")
+	cal.SetXWRCalName("Test")
 	SetMicrosoftCalscale(cal, "GREGORIAN")
-	SetPublishedTtl(cal, "PT12H")
+	cal.SetXPublishedTTL("PT12H")
 
 	foundCalname := false
 	foundCalscale := false
 	foundTtl := false
 
 	for _, prop := range cal.CalendarProperties {
-		if prop.IANAToken == PropertyCalname {
+		if prop.IANAToken == string(ical.PropertyXWRCalName) {
 			foundCalname = true
 			if prop.Value != "Test" {
 				t.Errorf("Expected Test, got %s", prop.Value)
 			}
 		}
-		if prop.IANAToken == PropertyMicrosoftCalscale {
+		if prop.IANAToken == string(PropertyMicrosoftCalscale) {
 			foundCalscale = true
 			if prop.Value != "GREGORIAN" {
 				t.Errorf("Expected GREGORIAN, got %s", prop.Value)
 			}
 		}
-		if prop.IANAToken == PropertyPublishedTtl {
+		if prop.IANAToken == string(ical.PropertyXPublishedTTL) {
 			foundTtl = true
 			if prop.Value != "PT12H" {
 				t.Errorf("Expected PT12H, got %s", prop.Value)
@@ -37,13 +37,13 @@ func TestCalendarProperties(t *testing.T) {
 	}
 
 	if !foundCalname {
-		t.Errorf("Property %s not found", PropertyCalname)
+		t.Errorf("Property %s not found", ical.PropertyXWRCalName)
 	}
 	if !foundCalscale {
 		t.Errorf("Property %s not found", PropertyMicrosoftCalscale)
 	}
 	if !foundTtl {
-		t.Errorf("Property %s not found", PropertyPublishedTtl)
+		t.Errorf("Property %s not found", ical.PropertyXPublishedTTL)
 	}
 }
 
@@ -60,25 +60,25 @@ func TestComponentProperties(t *testing.T) {
 	foundIsdraft := false
 
 	for _, prop := range event.Properties {
-		if prop.IANAToken == ComponentPropertyMicrosoftCdoAlldayevent {
+		if prop.IANAToken == string(ComponentPropertyMicrosoftCdoAlldayevent) {
 			foundAllday = true
 			if prop.Value != "TRUE" {
 				t.Errorf("Expected TRUE, got %s", prop.Value)
 			}
 		}
-		if prop.IANAToken == ComponentPropertyMicrosoftCdoBusystatus {
+		if prop.IANAToken == string(ComponentPropertyMicrosoftCdoBusystatus) {
 			foundBusy = true
 			if prop.Value != "OOF" {
 				t.Errorf("Expected OOF, got %s", prop.Value)
 			}
 		}
-		if prop.IANAToken == ComponentPropertyMicrosoftCdoImportance {
+		if prop.IANAToken == string(ComponentPropertyMicrosoftCdoImportance) {
 			foundImp = true
 			if prop.Value != "1" {
 				t.Errorf("Expected 1, got %s", prop.Value)
 			}
 		}
-		if prop.IANAToken == ComponentPropertyMicrosoftIsdraft {
+		if prop.IANAToken == string(ComponentPropertyMicrosoftIsdraft) {
 			foundIsdraft = true
 			if prop.Value != "TRUE" {
 				t.Errorf("Expected TRUE, got %s", prop.Value)
