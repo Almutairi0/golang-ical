@@ -654,6 +654,9 @@ func (cal *Calendar) addComponent(c Component) {
 }
 
 func (cal *Calendar) SetProperty(property Property, value string, params ...PropertyParameter) {
+	if cal == nil {
+		return
+	}
 	cal.setProperty(property, value, params...)
 }
 

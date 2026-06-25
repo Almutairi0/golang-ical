@@ -25,10 +25,16 @@ type propertySetter interface {
 
 // SetProperty allows extending the properties easily
 func SetProperty(cal *ical.Calendar, property string, value string, params ...ical.PropertyParameter) {
+	if cal == nil {
+		return
+	}
 	cal.SetProperty(ical.Property(property), value, params...)
 }
 
 func SetComponentProperty(c ical.Component, property string, value string, params ...ical.PropertyParameter) {
+	if c == nil {
+		return
+	}
 	if ps, ok := c.(propertySetter); ok {
 		ps.SetProperty(ical.ComponentProperty(property), value, params...)
 	}

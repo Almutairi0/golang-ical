@@ -18,6 +18,9 @@ const PropertyRelCalId = "X-WG-RELCALID"
 
 // SetProperty allows extending the properties easily
 func SetProperty(cal *ical.Calendar, property string, value string, params ...ical.PropertyParameter) {
+	if cal == nil {
+		return
+	}
 	cal.SetProperty(ical.Property(property), value, params...)
 }
 
