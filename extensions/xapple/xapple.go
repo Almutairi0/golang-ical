@@ -1,6 +1,3 @@
-//go:build !noapple
-// +build !noapple
-
 package xapple
 
 import (
