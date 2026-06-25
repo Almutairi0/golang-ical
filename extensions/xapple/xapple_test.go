@@ -1,9 +1,9 @@
 package xapple
 
 import (
+	ical "github.com/arran4/golang-ical"
 	"strings"
 	"testing"
-	ical "github.com/arran4/golang-ical"
 )
 
 func TestAppleProperties(t *testing.T) {
