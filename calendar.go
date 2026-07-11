@@ -436,8 +436,13 @@ func NewCalendarFor(service string) *Calendar {
 	return c
 }
 
-// Serialize converts the internal calendar object into its raw text representation.
-// By default, uses Unix-style line endings (LF). To strictly comply with the iCalendar
+// Serialize converts the Calendar and all its nested components (such as events,
+// timezones, and alarms) into a single, fully formatted iCalendar string.
+//
+// It accepts optional configuration arguments (ops) to customize the output layout,
+// such as setting custom line folding lengths or overriding line endings.
+//
+// Note on Line Endings: By default, uses Unix-style line endings (LF). To strictly comply with the iCalendar
 // specification (RFC 5545), which requires Windows-style line endings (CRLF) for broad
 // compatibility with clients like Outlook and Apple Calendar, pass the explicit formatting option:
 //
