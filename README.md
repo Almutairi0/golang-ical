@@ -71,6 +71,14 @@ When to use which constructor:
 
 Use `NewCalendarFor(service)` when you publish ICS from multiple applications/tenants and want each feed to identify its producer via `PRODID` while still using library defaults.
 
+### Important Note on Line Endings (RFC 5545 Compliance)
+
+By default, `.Serialize()` uses Unix-style line endings (`LF`). To strictly comply with the iCalendar specification (**RFC 5545**), which requires Windows-style line endings (`CRLF`) for broad compatibility with email and calendar clients like Outlook and Apple Calendar, pass the explicit formatting option:
+
+```golang
+return cal.Serialize(ics.WithNewLineWindows)
+```
+
 ## Parsing malformed properties (strict/skip/recover)
 
 By default, parsing is strict and returns an error for malformed content lines.

@@ -436,6 +436,12 @@ func NewCalendarFor(service string) *Calendar {
 	return c
 }
 
+// Serialize converts the internal calendar object into its raw text representation.
+// By default, uses Unix-style line endings (LF). To strictly comply with the iCalendar
+// specification (RFC 5545), which requires Windows-style line endings (CRLF) for broad
+// compatibility with clients like Outlook and Apple Calendar, pass the explicit formatting option:
+//
+//	cal.Serialize(ics.WithNewLineWindows)
 func (cal *Calendar) Serialize(ops ...any) string {
 	b := &strings.Builder{}
 	// We are intentionally ignoring the return value. _ used to communicate this to lint.
@@ -652,8 +658,6 @@ func (cal *Calendar) addComponent(c Component) {
 	}
 	cal.Components = append(cal.Components, c)
 }
-
-
 
 func (cal *Calendar) setProperty(property Property, value string, params ...PropertyParameter) {
 	for i := range cal.CalendarProperties {
