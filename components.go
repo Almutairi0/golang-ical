@@ -1050,8 +1050,9 @@ func (c *VAlarm) SerializeTo(w io.Writer, serialConfig *SerializationConfigurati
 	return c.ComponentBase.serializeThis(w, ComponentVAlarm, serialConfig)
 }
 
-func NewAlarm(tzId string) *VAlarm {
-	// Todo How did this come about?
+// NewAlarm creates a new VALARM component.
+// Note: The string parameter is unused as VALARM components do not have a UID property per RFC 5545.
+func NewAlarm(_ string) *VAlarm {
 	e := &VAlarm{}
 	return e
 }
