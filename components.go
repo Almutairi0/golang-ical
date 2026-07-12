@@ -1051,8 +1051,8 @@ func (c *VAlarm) SerializeTo(w io.Writer, serialConfig *SerializationConfigurati
 }
 
 // NewAlarm creates a new VALARM component.
-// Note: The uniqueId parameter is unused as VALARM components do not have a UID property per RFC 5545.
-func NewAlarm(uniqueId string) *VAlarm {
+// Note: The string parameter is unused as VALARM components do not have a UID property per RFC 5545.
+func NewAlarm(_ string) *VAlarm {
 	e := &VAlarm{}
 	return e
 }
