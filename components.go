@@ -1050,11 +1050,10 @@ func (c *VAlarm) SerializeTo(w io.Writer, serialConfig *SerializationConfigurati
 	return c.ComponentBase.serializeThis(w, ComponentVAlarm, serialConfig)
 }
 
-// NewAlarm creates a new VALARM component with the given uniqueId set as its UID.
+// NewAlarm creates a new VALARM component.
+// Note: The uniqueId parameter is unused as VALARM components do not have a UID property per RFC 5545.
 func NewAlarm(uniqueId string) *VAlarm {
-	e := &VAlarm{
-		NewComponent(uniqueId),
-	}
+	e := &VAlarm{}
 	return e
 }
 

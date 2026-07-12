@@ -81,7 +81,7 @@ event.SetSummary("Team meeting")
 event.SetStartAt(time.Now())
 event.SetEndAt(time.Now().Add(time.Hour))
 
-alarm := ics.NewAlarm("alarm-uid@domain")
+alarm := ics.NewAlarm("") // uniqueId is unused for VALARM
 alarm.SetAction(ics.ActionDisplay)
 alarm.SetTrigger("-PT15M") // fires 15 minutes before DTSTART
 alarm.SetDescription("Team meeting starting soon")
